@@ -37,6 +37,9 @@ def process_txt():
     fw = open('../data/bike_normal.txt', 'w')
     for line in f.readlines():
         items = line.split(',')
+        lng, lat = float(items[0]), float(items[1])
+        if lng > 121 or lng < 119 or lat > 31 or lat < 29:
+            continue
         stime = items[2].strip('\n')
         dtime = datetime.strptime(stime, '%Y/%m/%d %H:%M:%S')
         if 6 <= dtime.hour <= 24:

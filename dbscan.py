@@ -42,7 +42,7 @@ def point_to_addr_new(point):
 
 def get_data():
     xy_list = []
-    f = open("./data/bike_08.txt", 'r')
+    f = open("./data/bike_normal.txt", 'r')
     for line in f.readlines():
         items = line.split(',')
         x, y = float(items[0]), float(items[1])
@@ -55,9 +55,9 @@ def xy_dict():
     X = np.array(xy_list)
     tb = time.time()
     # y_pred = DBSCAN(eps=120, min_samples=300).fit_predict(X)
-    db = DBSCAN(eps=60, min_samples=200, n_jobs=-1).fit(X)
+    db = DBSCAN(eps=60, min_samples=1000, n_jobs=-1).fit(X)
     eb = time.time()
-    print 'time {0}'.format(eb - tb)
+    print 'dbscan time {0}'.format(eb - tb)
     labels = db.labels_
     x_dict = {}
     y_dict = {}
