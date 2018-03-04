@@ -34,17 +34,27 @@ def process_data():
 
 def process_txt():
     f = open('../data/bike.txt', 'r')
-    fw = open('../data/bike_normal.txt', 'w')
+    fp = open('../data/bike_normal.txt', 'w')
+    fp_list = []
+    for i in range(12):
+        filename = '../data/bike_{0}.txt'.format(i)
+        fw = open(filename, 'w')
+        fp_list.append(fw)
     for line in f.readlines():
         items = line.split(',')
         lng, lat = float(items[0]), float(items[1])
         if lng > 121 or lng < 119 or lat > 31 or lat < 29:
             continue
+        x, y = bl2xy(lat, lng)
         stime = items[2].strip('\n')
         dtime = datetime.strptime(stime, '%Y/%m/%d %H:%M:%S')
+        i = dtime.day
         if 6 <= dtime.hour <= 24:
-            fw.write(line)
-    fw.close()
+            line_str = "{0},{1},{2}\n".format(x, y, stime)
+            fp_list[i].write(line_str)
+            fp.write(line_str)
+    for i in range(12):
+        fp_list[i].close()
+    fp.close()
 
-# process_data()
 process_txt()
