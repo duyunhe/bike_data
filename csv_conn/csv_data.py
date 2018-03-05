@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # @Time    : 2018/3/2 14:06
 # @Author  : C.D.
-# @简介    : 读取自行车csv数据
+# @简介    : 读取自行车csv数据公共库
 # @File    : csv_data.py
 from datetime import datetime
 
@@ -52,7 +52,43 @@ def get_data_daily(filename, state='all'):
     return data
 
 
-def get_data_by_bike(filename, state='all'):
+def get_data_by_bike(filename, date_format):
+    fp = open(filename, 'r')
+
+    data = {}
+    line = fp.readline()
+    var = locals()
+    var_name = read_title(line)
+
+    idx = 0
+    with open(filename, 'rb') as fp:
+        for line in fp:
+            if idx == 0:
+                idx = 1
+                continue
+            temp = line.strip('\n').split(',')
+            items = [one.strip('\"') for one in temp]
+            for name, item in zip(var_name, items):
+                var[name] = item
+            bid = "{0}:{1}".format(var['CompanyId'], var['BicycleNo'])
+            str_time = var['PositionTime']
+            position_time = datetime.strptime(str_time, date_format)
+
+            day_time = position_time.strftime('%Y/%m/%d')
+            try:
+                data[bid].append(items)
+            except KeyError:
+                data[bid] = []
+                data[bid].append(items)
+            idx += 1
+            if idx % 10000 == 0:
+                print idx
+
+    fp.close()
+    return data
+
+
+def get_data_by_day(filename, state='all'):
     fp = open(filename, 'r')
 
     data = {}
@@ -86,13 +122,21 @@ def get_data_by_bike(filename, state='all'):
     return data
 
 
-def get_bike_last_data(filename):
-    datas = get_data_by_bike(filename)
+def get_bike_last_data_by_day(filename):
+    datas = get_data_by_day(filename)
     bike_status_list = {}
     for day in datas:
         bike_status_list[day] = []
         for bike, data_list in datas[day].items():
             bike_status_list[day].append(datas[day][bike][-1])
+    return bike_status_list
+
+
+def get_bike_last_data(filename, date_format):
+    datas = get_data_by_bike(filename, date_format)
+    bike_status_list = {}
+    for bid, data_list in datas.items():
+        bike_status_list[bid] = datas[bid][-1]
     return bike_status_list
 
 

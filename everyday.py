@@ -9,9 +9,10 @@ import time
 
 
 def main():
-    filename = './data/test.csv'
+    filename = './data/tb_bike_gps_1711.csv'
+    date_format = '%Y-%m-%d %H:%M:%S'
     bt = time.clock()
-    csv_data.get_bike_last_data(filename)
+    csv_data.get_bike_last_data(filename, date_format)
     et = time.clock()
     print et - bt
 
