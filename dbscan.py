@@ -7,6 +7,7 @@ import urllib2
 import json
 from datetime import datetime
 from pre.geo import xy2bl
+import psutil, os
 
 
 class Info(object):
@@ -67,6 +68,11 @@ def xy_dict():
     tb = time.time()
     # y_pred = DBSCAN(eps=120, min_samples=300).fit_predict(X)
     db = DBSCAN(eps=50, min_samples=800, n_jobs=-1).fit(X)
+    info = psutil.virtual_memory()
+    print u'内存使用：', psutil.Process(os.getpid()).memory_info().rss
+    print u'总内存：', info.total
+    print u'内存占比：', info.percent
+    print u'cpu个数：', psutil.cpu_count()
     eb = time.time()
     print 'dbscan time {0}'.format(eb - tb)
     labels = db.labels_
@@ -109,7 +115,8 @@ for n in x_dict:
         ave = np.mean(vec, axis=1)
         x, y = ave[0:2]
         lat, lng = xy2bl(x, y)
-        addr = point_to_addr_new([lng, lat])
+        addr = ''
+        # addr = point_to_addr_new([lng, lat])
         plt.text(x, y, str(n))
 
         time_stat = {}

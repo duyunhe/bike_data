@@ -1,4 +1,9 @@
+# coding=utf-8
 from ctypes import *
+import math
+import numpy as np
+from math import radians, cos, sin, asin, sqrt
+
 
 dll = WinDLL("CoordTransDLL.dll")
 
@@ -39,3 +44,184 @@ def xy2bl(x, y):
     global dll
     dll.HZ_xyH_2_WGS84_BLH(xyz, byref(blh))
     return blh.b, blh.l
+
+
+def calc_dist(pt0, pt1):
+    """
+    计算两点距离
+    :param pt0: [x0, y0]
+    :param pt1: [x1, y1]
+    :return: 
+    """
+    v0 = np.array(pt0)
+    v1 = np.array(pt1)
+    dist = np.linalg.norm(v0 - v1)
+    return dist
+
+
+def calc_included_angle(s0p0, s0p1, s1p0, s1p1):
+    """
+    计算夹角
+    :param s0p0: 线段0点0 其中点用[x,y]表示
+    :param s0p1: 线段0点1 
+    :param s1p0: 线段1点0
+    :param s1p1: 线段1点1
+    :return: 
+    """
+    v0 = np.array([s0p1[0] - s0p0[0], s0p1[1] - s0p0[1]])
+    v1 = np.array([s1p1[0] - s1p0[0], s1p1[1] - s1p0[1]])
+    return np.dot(v0, v1) / (np.sqrt(np.dot(v0, v0)) * np.sqrt(np.dot(v1, v1)))
+
+
+def is_near_segment(pt0, pt1, pt2, pt3):
+    v0 = np.array([pt1[0] - pt0[0], pt1[1] - pt0[1]])
+    v1 = np.array([pt3[0] - pt2[0], pt3[1] - pt2[1]])
+    return np.dot(v0, v1) / (np.sqrt(np.dot(v0, v0)) * np.sqrt(np.dot(v1, v1))) > math.cos(np.pi / 1.5)
+
+
+def get_eps(x0, y0, x1, y1):
+    # calculate arctan(dy / dx)
+    dx, dy = x1 - x0, y1 - y0
+    # angle = angle * 180 / np.pi
+    if np.fabs(dx) < 1e-10:
+        if y1 > y0:
+            return 90
+        else:
+            return -90
+    angle = math.atan2(dy, dx)
+    angle2 = angle * 180 / np.pi
+    return angle2
+
+
+def get_diff(e0, e1):
+    # 计算夹角，取pi/2到-pi/2区间的绝对值
+    de = e1 - e0
+    if de >= 180:
+        de -= 360
+    elif de < -180:
+        de += 360
+    return math.fabs(de)
+
+
+def point_project_edge(point, edge):
+    n0, n1 = edge.node0, edge.node1
+    sp0, sp1 = n0.point, n1.point
+    return point_project(point, sp0, sp1)
+
+
+def point_project(point, segment_point0, segment_point1):
+    """
+    :param point: point to be matched
+    :param segment_point0: segment
+    :param segment_point1: 
+    :return: projected point, state
+    """
+    x, y = point[0:2]
+    x0, y0 = segment_point0[0:2]
+    x1, y1 = segment_point1[0:2]
+    ap, ab = np.array([x - x0, y - y0]), np.array([x1 - x0, y1 - y0])
+    ac = np.dot(ap, ab) / (np.dot(ab, ab)) * ab
+    dx, dy = ac[0] + x0, ac[1] + y0
+    state = 0
+    if np.dot(ap, ab) < 0:
+        state = -1
+    bp, ba = np.array([x - x1, y - y1]), np.array([x0 - x1, y0 - y1])
+    if np.dot(bp, ba) < 0:
+        state = 1
+    return [dx, dy], ac, state
+
+
+def point2segment(point, segment_point0, segment_point1):
+    """
+
+    :param point: point to be matched
+    :param segment_point0: segment
+    :param segment_point1: 
+    :return: dist from point to segment
+    """
+    x, y = point[0:2]
+    x0, y0 = segment_point0[0:2]
+    x1, y1 = segment_point1[0:2]
+    cr = (x1 - x0) * (x - x0) + (y1 - y0) * (y - y0)
+    if cr <= 0:
+        return math.sqrt((x - x0) * (x - x0) + (y - y0) * (y - y0))
+    d2 = (x1 - x0) * (x1 - x0) + (y1 - y0) * (y1 - y0)
+    if cr >= d2:
+        return math.sqrt((x - x1) * (x - x1) + (y - y1) * (y - y1))
+    r = cr / d2
+    px = x0 + (x1 - x0) * r
+    py = y0 + (y1 - y0) * r
+    return math.sqrt((x - px) * (x - px) + (y - py) * (y - py))
+
+
+def draw_raw(traj, ax):
+    xlist, ylist = [], []
+    for point in traj:
+        xlist.append(point.px)
+        ylist.append(point.py)
+    ax.plot(xlist, ylist, marker='o', linestyle='--', color='k', lw=1)
+
+
+def transform(wgLat, wgLon):
+    """
+    transform(latitude,longitude) , WGS84
+    return (latitude,longitude) , GCJ02
+    """
+    a = 6378245.0
+    ee = 0.00669342162296594323
+    if outOfChina(wgLat, wgLon):
+        mgLat = wgLat
+        mgLon = wgLon
+        return
+    dLat = transformLat(wgLon - 105.0, wgLat - 35.0)
+    dLon = transformLon(wgLon - 105.0, wgLat - 35.0)
+    radLat = wgLat / 180.0 * math.pi
+    magic = math.sin(radLat)
+    magic = 1 - ee * magic * magic
+    sqrtMagic = math.sqrt(magic)
+    dLat = (dLat * 180.0) / ((a * (1 - ee)) / (magic * sqrtMagic) * math.pi)
+    dLon = (dLon * 180.0) / (a / sqrtMagic * math.cos(radLat) * math.pi)
+    mgLat = wgLat + dLat
+    mgLon = wgLon + dLon
+    return mgLat, mgLon
+
+
+def outOfChina(lat, lon):
+    if lon < 72.004 or lon > 137.8347:
+        return True
+    if lat < 0.8293 or lat > 55.8271:
+        return True
+    return False
+
+
+def transformLat(x, y):
+    ret = -100.0 + 2.0 * x + 3.0 * y + 0.2 * y * y + 0.1 * x * y + 0.2 * math.sqrt(abs(x))
+    ret += (20.0 * math.sin(6.0 * x * math.pi) + 20.0 * math.sin(2.0 * x * math.pi)) * 2.0 / 3.0
+    ret += (20.0 * math.sin(y * math.pi) + 40.0 * math.sin(y / 3.0 * math.pi)) * 2.0 / 3.0
+    ret += (160.0 * math.sin(y / 12.0 * math.pi) + 320 * math.sin(y * math.pi / 30.0)) * 2.0 / 3.0
+    return ret
+
+
+def transformLon(x, y):
+    ret = 300.0 + x + 2.0 * y + 0.1 * x * x + 0.1 * x * y + 0.1 * math.sqrt(abs(x))
+    ret += (20.0 * math.sin(6.0 * x * math.pi) + 20.0 * math.sin(2.0 * x * math.pi)) * 2.0 / 3.0
+    ret += (20.0 * math.sin(x * math.pi) + 40.0 * math.sin(x / 3.0 * math.pi)) * 2.0 / 3.0
+    ret += (150.0 * math.sin(x / 12.0 * math.pi) + 300.0 * math.sin(x / 30.0 * math.pi)) * 2.0 / 3.0
+    return ret
+
+
+def haversine(lon1, lat1, lon2, lat2):  # 经度1，纬度1，经度2，纬度2 （十进制度数）
+    """
+    Calculate the great circle distance between two points 
+    on the earth (specified in decimal degrees)
+    """
+    # 将十进制度数转化为弧度
+    lon1, lat1, lon2, lat2 = map(radians, [lon1, lat1, lon2, lat2])
+
+    # haversine公式
+    dlon = lon2 - lon1
+    dlat = lat2 - lat1
+    a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
+    c = 2 * asin(sqrt(a))
+    r = 6371    # 地球平均半径，单位为公里
+    return c * r * 1000
