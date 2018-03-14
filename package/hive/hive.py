@@ -4,11 +4,10 @@
 # @简介    : 
 # @File    : hive_new.py
 
-import shapefile
-import numpy as np
 import time
-from pre import geo
 import matplotlib.pyplot as plt
+import numpy as np
+from package.pre import geo
 
 unitx = 0.00336868231321
 unity = 0.00338976483195
@@ -90,38 +89,6 @@ def str2int(name):
     elif len(name) == 3:
         return (ch2int(name[0]) + 1) * 26 * 26 + (ch2int(name[1]) + 1) * 26 + ch2int(name[2])
     return ans
-
-
-def read_shape():
-    sf = shapefile.Reader(".\hive\hive.shp")
-    rec = sf.records()
-    bt = time.clock()
-    fp = open(".\hive\hive.txt", 'w')
-    for i in range(len(rec)):
-        name = rec[i][0]
-        items = name.split('-')
-        col, row = items[0], items[1]
-        irow = int(row)
-        icol = str2int(col)
-        sp = sf.shape(i)
-        pts = sp.points
-        for j in range(len(pts)):
-            py, px = geo.transform(pts[j][1], pts[j][0])
-            pts[j] = (px, py)
-        cx, cy = (pts[0][0] + pts[3][0]) / 2, (pts[0][1] + pts[3][1]) / 2
-        center = np.array([cx, cy])
-        hg = HiveGrid(irow, icol, center, pts)
-        fp.write("{0},{1},{2},{3},".format(irow, icol, center[0], center[1]))
-        str_pts = []
-        for pt in pts:
-            str_pt = "{0}:{1}".format(pt[0], pt[1])
-            str_pts.append(str_pt)
-        str_line = ','.join(str_pts)
-        fp.write(str_line)
-        fp.write('\n')
-    fp.close()
-    et = time.clock()
-    print et - bt
 
 
 def read_hive():
